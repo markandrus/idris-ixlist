@@ -36,6 +36,9 @@ isCons _  = True
 -- Length
 --------------------------------------------------------------------------------
 
+||| Compute the length of an IxList.
+|||
+||| Runs in linear time
 length : IxList ts -> Nat
 length [] = 0
 length (x::xs) = 1 + length xs
@@ -123,8 +126,8 @@ drop (S n) (x :: xs) = drop n xs
 takeWhile : (p : t -> Bool) -> IxList {t} xs -> IxList (takeWhile p xs)
 takeWhile _ [] = []
 takeWhile p (x :: xs) with (p x)
-  takeWhile p (x :: xs) | True = x :: takeWhile p xs
-  takeWhile p (x :: xs) | False = []
+  | True = x :: takeWhile p xs
+  | False = []
 
 ||| Remove the longest prefix of an IxList such that all removed elements
 ||| satisfy some Boolean predicate.
@@ -133,8 +136,8 @@ takeWhile p (x :: xs) with (p x)
 dropWhile : (p : t -> Bool) -> IxList {t} xs -> IxList (dropWhile p xs)
 dropWhile _ [] = []
 dropWhile p (x :: xs) with (p x)
-  dropWhile p (x :: xs) | True = dropWhile p xs
-  dropWhile p (x :: xs) | False = x :: xs
+  | True = dropWhile p xs
+  | False = x :: xs
 
 --------------------------------------------------------------------------------
 -- Building (bigger) IxLists
@@ -142,12 +145,151 @@ dropWhile p (x :: xs) with (p x)
 
 ||| Append two IxLists
 (++) : IxList as -> IxList bs -> IxList (as ++ bs)
-(++) []      right = right
-(++) (x::xs) right = x :: (xs ++ right)
+(++) []        right = right
+(++) (x :: xs) right = x :: (xs ++ right)
 
 ||| Construct an IxList with `n` copies of `x`
 ||| @ n how many copies
 ||| @ x the element to replicate
 replicate : (n : Nat) -> (x : t) -> IxList (replicate n x)
-replicate Z     x = []
+replicate Z     _ = []
 replicate (S n) x = x :: replicate n x
+
+--------------------------------------------------------------------------------
+-- Zips and unzips
+--------------------------------------------------------------------------------
+
+||| Combine two IxLists element-wise using some function. If they are different
+||| lengths, the result is truncate to the length of the shorter IxList.
+||| @ f the function to combine elements with
+||| @ l the first IxList
+||| @ r the second IxList
+zipWith : (f : a -> b -> c)
+       -> (l : IxList xs)
+       -> (r : IxList ys)
+       -> IxList (zipWith f xs ys)
+zipWith _ []        (_ :: _)  = []
+zipWith _ (_ :: _)  []        = []
+zipWith _ []        []        = []
+zipWith f (x :: xs) (y :: ys) = f x y :: zipWith f xs ys
+
+-- TODO: Figure out why this doesn't typecheck.
+-- ||| Combine three IxLists element-wise using some function. If they are
+-- ||| different lengths, the result is truncated to the length of the shortest
+-- ||| IxList.
+-- ||| @ f the function to combine elements with
+-- ||| @ x the first IxList
+-- ||| @ y the second IxList
+-- ||| @ z the third IxList
+-- zipWith3 : (f : a -> b -> c -> d)
+--         -> (x : IxList xs)
+--         -> (y : IxList ys)
+--         -> (z : IxList zs)
+--         -> IxList (zipWith3 f xs ys zs)
+-- zipWith3 f _         []        (_ :: _)  = []
+-- zipWith3 f _         (_ :: _)  []        = []
+-- zipWith3 f []        (_ :: _)  _         = []
+-- zipWith3 f (_ :: _)  []        _         = []
+-- zipWith3 f []        []        []        = []
+-- zipWith3 f (x :: xs) (y :: ys) (z :: zs) = f x y z :: zipWith3 f xs ys zs
+
+||| Combine two IxLists element-wise into pairs
+zip : (l : IxList as) -> (r : IxList bs) -> IxList (zip as bs)
+zip = zipWith (\x, y => (x, y))
+
+-- TODO: Uncomment this once zipWith3 works.
+-- ||| Combine three IxLists element-wise into tuples
+-- zip3 : (x : IxList as) -> (y : IxList bs) -> (z : IxList cs) -> IxList (zip3 as bs cs)
+-- zip3 = zipWith3 (\x, y, z => (x, y, z))
+
+||| Split an an IxList of pairs into two IxLists
+unzip : IxList {t=(a, b)} xs
+     -> (IxList (map Prelude.Basics.fst xs),
+         IxList (map Prelude.Basics.snd xs))
+unzip [] = ([], [])
+unzip ((l, r) :: xs) with (unzip xs)
+  | (lefts, rights) = (l :: lefts, r :: rights)
+
+-- TODO: Add unzip3 once zip3 works.
+
+--------------------------------------------------------------------------------
+-- Maps
+--------------------------------------------------------------------------------
+
+||| Apply a partial function to the elements of an IxList, keeping the ones at
+||| which it is defined.
+mapMaybe : (f : a -> Maybe b) -> IxList xs -> IxList (mapMaybe f xs)
+mapMaybe _ [] = []
+mapMaybe f (x :: xs) with (f x)
+  | Nothing = mapMaybe f xs
+  | Just j  = j :: mapMaybe f xs
+
+
+--------------------------------------------------------------------------------
+-- Folds
+--------------------------------------------------------------------------------
+
+-- TODO: Foldable
+
+--------------------------------------------------------------------------------
+-- Special folds
+--------------------------------------------------------------------------------
+
+-- TODO: toIxList
+
+--------------------------------------------------------------------------------
+-- Transformations
+--------------------------------------------------------------------------------
+
+-- TODO: reverse
+
+-- TODO: Figure out why this doesn't typecheck.
+-- ||| Insert some separator between the elements of an IxList.
+-- intersperse : (a : t) -> IxList {t} as -> IxList (intersperse a as)
+-- intersperse _ [] = []
+-- intersperse sep (x :: xs) = x :: intersperse' sep xs where
+--   intersperse' sep []      = []
+--   intersperse' sep (y::ys) = sep :: y :: intersperse' sep ys
+
+-- TODO: intercalate
+
+-- TODO: transpose
+
+--------------------------------------------------------------------------------
+-- Membership tests
+--------------------------------------------------------------------------------
+
+||| Check if something is a member of an IxList using a custom comparison.
+elemBy : (t -> t -> Bool) -> t -> IxList {t} ts -> Bool
+elemBy _ _ [] = False
+elemBy p e (x :: xs) = if p e x then True else elemBy p e xs
+
+||| Check if something is a member of an IxList using the default Boolean
+||| equality.
+elem : Eq t => t -> IxList {t} ts -> Bool
+elem = elemBy (==)
+
+||| Find associated information in an IxList using a custom comparison.
+lookupBy : (a -> a -> Bool) -> a -> IxList {t=(a, b)} xs -> Maybe b
+lookupBy _ _ [] = Nothing
+lookupBy p e (x :: xs) = let (l, r) = x in if p e l
+  then Just r
+  else lookupBy p e xs
+
+||| Find associated information in an IxList using Boolean equality.
+lookup : Eq a => a -> IxList {t=(a, b)} xs -> Maybe b
+lookup = lookupBy (==)
+
+||| Check if any elements of the first IxList are found in the second, using
+||| a custom comparison.
+hasAnyBy : (t -> t -> Bool) -> IxList {t} xs -> IxList {t} ys -> Bool
+hasAnyBy _ _ [] = False
+hasAnyBy p elems (x::xs) = if elemBy p x elems
+  then True
+  else hasAnyBy p elems xs
+
+
+||| Check if any elements of the first IxList are found in the second, using
+||| Boolean equality.
+hasAny : Eq t => IxList {t} xs -> IxList {t} ys -> Bool
+hasAny = hasAnyBy (==)
