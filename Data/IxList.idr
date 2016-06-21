@@ -1,11 +1,13 @@
 -- -------------------------------------------------------------- [ IxList.idr ]
 -- Module    : IxList.idr
 -- Copyright : (c) 2016 See CONTRIBUTORS.md
--- License   : see LICENSE
+-- License   : see LICENSE.md
 -- --------------------------------------------------------------------- [ EOH ]
-
 module Data.IxList
 
+import Data.List
+
+%access public export
 %default total
 
 ||| A list indexed by its elements
@@ -293,3 +295,60 @@ hasAnyBy p elems (x::xs) = if elemBy p x elems
 ||| Boolean equality.
 hasAny : Eq t => IxList {t} xs -> IxList {t} ys -> Bool
 hasAny = hasAnyBy (==)
+
+||| A proof that some element is found in an IxList.
+data Elem : t -> IxList {t} ts -> Type where
+
+  ||| A proof that the element is at the front of the IxList.
+  Here : IxList.Elem x (x :: xs)
+
+  ||| A proof that the element is after the front of the IxList.
+  There : (later : IxList.Elem x xs) -> Elem x (y :: xs)
+
+Uninhabited (Elem {t} x []) where
+  uninhabited Here impossible
+  uninhabited (There _) impossible
+
+||| Is the given element a member of the given IxList?
+|||
+||| @ x the element to be tested
+||| @ xs the IxList to be checked against
+isElem : DecEq t => (x : t) -> (xs : IxList ts) -> Dec (Elem x xs)
+isElem _ [] = No absurd
+isElem x (y :: xs) with (decEq x y)
+  isElem x (x :: xs) | Yes Refl = Yes Here
+  isElem x (y :: xs) | No contra with (isElem x xs)
+    isElem x (y :: xs) | No contra | Yes prf = Yes (There prf)
+    isElem x (y :: xs) | No contra | No f = No (mkNo contra f) where
+      mkNo : {xs' : IxList a}
+          -> (x' = y' -> Void)
+          -> (Elem x' xs' -> Void)
+          -> Elem x' (y' :: xs')
+          -> Void
+      mkNo f _ Here = f Refl
+      mkNo _ g (There x) = g x
+
+--------------------------------------------------------------------------------
+-- Misc.
+--------------------------------------------------------------------------------
+
+-- TODO: Implement me.
+-- ||| Remove the element at the given position.
+-- |||
+-- ||| @ xs the IxList to be removed from
+-- ||| @ p a proof that the element to be removed is in the IxList
+
+-- TODO: Implement me.
+-- ||| The intersectBy function returns the intersect of two IxLists by a
+-- ||| user-supplied equality predicate.
+-- intersectBy : (p : a -> a -> Bool)
+--            -> IxList as
+--            -> IxList bs
+--            -> IxList (Data.List.intersectBy p as bs)
+-- intersectBy eq xs ys = [x | x <- xs, any (eq x) ys]
+
+-- TODO: Implement me.
+-- ||| Compute the intersection of two IxLists according to their `Eq`
+-- ||| implementation.
+-- intersect : Eq t => IxList {t} as -> IxList bs -> IxList (intersect as bs)
+-- intersect = intersectBy (==)
